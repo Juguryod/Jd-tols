@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ALCHEMY NK-DISTORTION 🔴⚪</title>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<style>
+body {
+  margin: 0;
+  background: radial-gradient(circle, #1a0000 0%, #000 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0;
+  font-family: 'Arial Black', sans-serif;
+}
+
+/* ADMIN ZONA */
+#admin-trigger {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 80px;
+  height: 80px;
+  z-index: 10001;
+}
+
+/* GALERIA */
+#galeria {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  width: 95%;
+  max-width: 420px;
+}
+
+/* CARD */
+.card {
+  border-radius: 15px;
+  overflow: hidden;
+  border: 2px solid #222;
+  background: #080808;
+  transition: 0.3s;
+}
+
+.card:hover {
+  transform: scale(1.03);
+  box-shadow: 0 0 25px red, 0 0 40px blue;
+}
+
+/* IMAGEN */
+.img-box img {
+  width: 100%;
+}
+
+/* TEXTO */
+.msg {
+  text-align: center;
+  padding: 10px;
+  animation: brillo 2s infinite alternate;
+}
+
+@keyframes brillo {
+  0% { color: #ffcc00; }
+  100% { color: #fff; }
+}
+
+/* BOTONES */
+.btn {
+  width: 100%;
+  padding: 15px;
+  border: none;
+  color: white;
+  cursor: pointer;
+}
+
+.btn-descargar {
+  background: #00c853;
+  animation: neon 2s infinite alternate;
+}
+
+@keyframes neon {
+  0% { box-shadow: 0 0 5px #00c853; }
+  100% { box-shadow: 0 0 20px #00ffcc; }
+}
+
+.btn-borrar {
+  background: red;
+}
+
+/* PANEL ADMIN */
+#admin-panel {
+  display:none;
+  position:fixed;
+  top:10%;
+  z-index:10002;
+  background:#111;
+  padding:20px;
+  border-radius:15px;
+  border:2px solid #ffcc00;
+}
+</style>
+</head>
+<body>
+
+<!-- ZONA SECRETA -->
+<div id="admin-trigger" onclick="adminGo()"></div>
+
+<!-- PANEL ADMIN -->
+<div id="admin-panel">
+  <h3 style="color:#ffcc00">ADMIN</h3>
+
+  <input type="file" id="iI"><br><br>
+  <input type="text" id="link" placeholder="Pega link MediaFire"><br><br>
+
+  <button onclick="subir()">PUBLICAR</button>
+</div>
+
+<div id="galeria"></div>
+
+<script>
+const firebaseConfig = {
+  databaseURL: "https://descargas-app-2d3d8-default-rtdb.firebaseio.com"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let toques=0;
+let esAdmin = false;
+
+// ACTIVAR ADMIN
+function adminGo(){
+  toques++;
+  if(toques>=5){
+    if(prompt("PASSWORD")=="282828373"){
+      document.getElementById("admin-panel").style.display="block";
+      esAdmin = true;
+      cargar();
+    }
+    toques=0;
+  }
+  setTimeout(()=>toques=0,2000);
+}
+
+// SUBIR
+async function subir(){
+  const i=document.getElementById("iI").files[0];
+  const link=document.getElementById("link").value;
+
+  if(!i || !link) return alert("Falta imagen o link");
+
+  const fd=new FormData();
+  fd.append("reqtype","fileupload");
+  fd.append("fileToUpload",i);
+
+  const r=await fetch("https://corsproxy.io/?https://catbox.moe/user/api.php",{
+    method:"POST",
+    body:fd
+  });
+
+  const img=await r.text();
+
+  await db.ref("posts/"+Date.now()).set({
+    img:img.trim(),
+    file:link,
+    dls:0
+  });
+
+  location.reload();
+}
+
+// CARGAR POSTS
+function cargar(){
+  db.ref("posts").once("value",snap=>{
+    const gal=document.getElementById("galeria");
+    gal.innerHTML="";
+    if(!snap.exists())return;
+
+    const data=snap.val();
+    const keys=Object.keys(data);
+
+    keys.reverse().forEach(k=>{
+      const d=data[k];
+
+      const div=document.createElement("div");
+      div.className="card";
+
+      div.innerHTML=`
+        <div class="img-box">
+          <img src="${d.img}">
+        </div>
+
+        <p class="msg">
+          ⚠️ Primero descarga una skin para después usarla
+        </p>
+
+        <button class="btn btn-descargar" onclick="descargar('${k}','${d.file}')">
+          DESCARGAR
+        </button>
+
+        ${esAdmin ? `<button class="btn btn-borrar" onclick="borrar('${k}')">BORRAR</button>` : ""}
+      `;
+
+      gal.appendChild(div);
+    });
+  });
+}
+
+cargar();
+
+// DESCARGAR
+function descargar(id,url){
+  db.ref("posts/"+id+"/dls").transaction(c=>(c||0)+1);
+  window.location.href = url;
+}
+
+// BORRAR (solo admin)
+function borrar(id){
+  if(!esAdmin) return;
+  if(confirm("¿Borrar esta skin?")){
+    db.ref("posts/"+id).remove();
+    cargar();
+  }
+}
+</script>
+
+</body>
+</html>
